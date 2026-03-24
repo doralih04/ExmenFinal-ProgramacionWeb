@@ -34,4 +34,23 @@ public class AuthController : ControllerBase
 
         return Created("", response);
     }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errores = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+            return BadRequest(ApiResponse<object>.Fail("Errores de validación", errores));
+        }
+
+        var response = await _authService.LoginAsync(request);
+
+        if (!response.Exito)
+        {
+            return Unauthorized(response);
+        }
+
+        return Ok(response);
+    }
 }
