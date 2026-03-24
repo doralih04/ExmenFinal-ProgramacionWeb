@@ -18,26 +18,20 @@ public class TorneoService : ITorneoService
 
     public async Task<ApiResponse<TorneoResponse>> CrearTorneoAsync(CrearTorneoRequest request)
     {
-        // 1. Validar que el juego exista
+        // 1. Validar juego
         DocumentReference juegoRef = _firestoreDb.Collection("juegos").Document(request.Juego);
         DocumentSnapshot juegoSnapshot = await juegoRef.GetSnapshotAsync();
-        if (!juegoSnapshot.Exists)
-        {
-            return ApiResponse<TorneoResponse>.Fail("El juego especificado no existe en la base de datos.");
-        }
+        if (!juegoSnapshot.Exists) return ApiResponse<TorneoResponse>.Fail("El juego especificado no existe.");
 
-        // 2. Validar que el organizador exista y sea "organizador" o "admin"
+        // 2. Validar organizador
         DocumentReference organizadorRef = _firestoreDb.Collection("jugadores").Document(request.Organizador);
         DocumentSnapshot organizadorSnapshot = await organizadorRef.GetSnapshotAsync();
-        if (!organizadorSnapshot.Exists)
-        {
-            return ApiResponse<TorneoResponse>.Fail("El organizador especificado no existe en la base de datos.");
-        }
+        if (!organizadorSnapshot.Exists) return ApiResponse<TorneoResponse>.Fail("El organizador especificado no existe.");
 
         var rolOrganizador = organizadorSnapshot.GetValue<string>("rol");
         if (rolOrganizador != "organizador" && rolOrganizador != "admin")
         {
-            return ApiResponse<TorneoResponse>.Fail("El usuario especificado no tiene permiso para organizar torneos (requiere rol organizador o admin).");
+            return ApiResponse<TorneoResponse>.Fail("El usuario no tiene rol de organizador o admin.");
         }
 
         Torneo nuevoTorneo = new Torneo
@@ -49,7 +43,7 @@ public class TorneoService : ITorneoService
             Estado = request.Estado,
             Formato = request.Formato,
             MaxParticipantes = request.MaxParticipantes,
-            ParticipantesActuales = 0, // Regla de inicialización
+            ParticipantesActuales = 0, // Regla
             PrecioInscripcion = request.PrecioInscripcion,
             PremioTotal = request.PremioTotal,
             FechaInicio = request.FechaInicio.ToUniversalTime(),
@@ -59,7 +53,7 @@ public class TorneoService : ITorneoService
             MaxNivel = request.MaxNivel,
             RequiereEquipo = request.RequiereEquipo,
             TamanioEquipo = request.TamanioEquipo,
-            FechaCreacion = DateTime.UtcNow, // Regla de inicialización
+            FechaCreacion = DateTime.UtcNow, // Regla
             ReglasModificadas = request.ReglasModificadas
         };
 
@@ -67,6 +61,115 @@ public class TorneoService : ITorneoService
         nuevoTorneo.Id = docRef.Id;
 
         return ApiResponse<TorneoResponse>.Success(MapearAResponse(nuevoTorneo), "Torneo creado exitosamente.");
+    }
+
+    public async Task<ApiResponse<List<TorneoResponse>>> ObtenerTorneosAsync(string? juego, string? estado, string? formato)
+    {
+        Query query = _firestoreDb.Collection(ColeccionTorneos);
+
+        if (!string.IsNullOrEmpty(juego))
+            query = query.WhereEqualTo("juego", juego);
+        
+        if (!string.IsNullOrEmpty(estado))
+            query = query.WhereEqualTo("estado", estado);
+
+        if (!string.IsNullOrEmpty(formato))
+            query = query.WhereEqualTo("formato", formato);
+
+        QuerySnapshot snapshot = await query.GetSnapshotAsync();
+        List<TorneoResponse> torneos = new();
+
+        foreach (var doc in snapshot.Documents)
+        {
+            if (doc.Exists)
+            {
+                Torneo t = doc.ConvertTo<Torneo>();
+                t.Id = doc.Id;
+                torneos.Add(MapearAResponse(t));
+            }
+        }
+
+        return ApiResponse<List<TorneoResponse>>.Success(torneos);
+    }
+
+    public async Task<ApiResponse<TorneoResponse>> ObtenerTorneoAsync(string id)
+    {
+        DocumentReference docRef = _firestoreDb.Collection(ColeccionTorneos).Document(id);
+        DocumentSnapshot snapshot = await docRef.GetSnapshotAsync();
+
+        if (!snapshot.Exists)
+        {
+            return ApiResponse<TorneoResponse>.Fail("Torneo no encontrado.");
+        }
+
+        Torneo torneo = snapshot.ConvertTo<Torneo>();
+        torneo.Id = snapshot.Id;
+
+        return ApiResponse<TorneoResponse>.Success(MapearAResponse(torneo));
+    }
+
+    public async Task<ApiResponse<TorneoResponse>> ActualizarTorneoAsync(string id, ActualizarTorneoRequest request)
+    {
+        DocumentReference docRef = _firestoreDb.Collection(ColeccionTorneos).Document(id);
+        DocumentSnapshot snapshot = await docRef.GetSnapshotAsync();
+
+        if (!snapshot.Exists) return ApiResponse<TorneoResponse>.Fail("Torneo no encontrado.");
+
+        Torneo torneoExistente = snapshot.ConvertTo<Torneo>();
+
+        // Validar que el Juego referenciado exista si es que fue modificado o re-inyectado
+        DocumentReference juegoRef = _firestoreDb.Collection("juegos").Document(request.Juego);
+        DocumentSnapshot juegoSnapshot = await juegoRef.GetSnapshotAsync();
+        if (!juegoSnapshot.Exists) return ApiResponse<TorneoResponse>.Fail("El juego referenciado no existe.");
+
+        // Regla: no permitir reducir maxParticipantes por debajo de participantesActuales
+        if (request.MaxParticipantes < torneoExistente.ParticipantesActuales)
+        {
+            return ApiResponse<TorneoResponse>.Fail($"No se puede reducir el máximo de participantes por debajo de los participantes actuales ({torneoExistente.ParticipantesActuales}).");
+        }
+
+        Dictionary<string, object> updates = new Dictionary<string, object>
+        {
+            { "nombre", request.Nombre },
+            { "juego", request.Juego },
+            { "descripcion", request.Descripcion },
+            { "formato", request.Formato },
+            { "maxParticipantes", request.MaxParticipantes },
+            { "precioInscripcion", request.PrecioInscripcion },
+            { "premioTotal", request.PremioTotal },
+            { "fechaInicio", request.FechaInicio.ToUniversalTime() },
+            { "fechaFin", request.FechaFin.ToUniversalTime() },
+            { "fechaLimiteInscripcion", request.FechaLimiteInscripcion.ToUniversalTime() },
+            { "minNivel", request.MinNivel },
+            { "maxNivel", request.MaxNivel },
+            { "requiereEquipo", request.RequiereEquipo },
+            { "tamanioEquipo", request.TamanioEquipo },
+            { "reglasModificadas", request.ReglasModificadas }
+        };
+
+        await docRef.UpdateAsync(updates);
+
+        DocumentSnapshot updatedSnapshot = await docRef.GetSnapshotAsync();
+        Torneo torneoUpdated = updatedSnapshot.ConvertTo<Torneo>();
+        torneoUpdated.Id = updatedSnapshot.Id;
+
+        return ApiResponse<TorneoResponse>.Success(MapearAResponse(torneoUpdated), "Torneo actualizado exitosamente.");
+    }
+
+    public async Task<ApiResponse<TorneoResponse>> CambiarEstadoTorneoAsync(string id, CambiarEstadoTorneoRequest request)
+    {
+        DocumentReference docRef = _firestoreDb.Collection(ColeccionTorneos).Document(id);
+        DocumentSnapshot snapshot = await docRef.GetSnapshotAsync();
+
+        if (!snapshot.Exists) return ApiResponse<TorneoResponse>.Fail("Torneo no encontrado.");
+
+        await docRef.UpdateAsync("estado", request.Estado);
+
+        DocumentSnapshot updatedSnapshot = await docRef.GetSnapshotAsync();
+        Torneo torneoUpdated = updatedSnapshot.ConvertTo<Torneo>();
+        torneoUpdated.Id = updatedSnapshot.Id;
+
+        return ApiResponse<TorneoResponse>.Success(MapearAResponse(torneoUpdated), $"Estado del torneo modificado a '{request.Estado}'.");
     }
 
     private TorneoResponse MapearAResponse(Torneo torneo)
