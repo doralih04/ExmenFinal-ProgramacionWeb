@@ -11,10 +11,12 @@ namespace JuegosTorneosApi.Controllers;
 public class TorneosController : ControllerBase
 {
     private readonly ITorneoService _torneoService;
+    private readonly IParticipacionService _participacionService;
 
-    public TorneosController(ITorneoService torneoService)
+    public TorneosController(ITorneoService torneoService, IParticipacionService participacionService)
     {
         _torneoService = torneoService;
+        _participacionService = participacionService;
     }
 
     [HttpGet]
@@ -93,5 +95,28 @@ public class TorneosController : ControllerBase
             return NotFound(response);
 
         return Ok(response);
+    }
+
+    [HttpPost("{torneoId}/inscribirse")]
+    [Authorize] // Autenticado para poder leer su Claim
+    public async Task<IActionResult> Inscribirse(string torneoId, [FromBody] InscribirseTorneoRequest request)
+    {
+        // Obtener ID del jugador desde el JWT Claim NameIdentifier (donde guardamos jugadorId en el commit 1)
+        var jugadorIdClaim = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        
+        if (string.IsNullOrEmpty(jugadorIdClaim))
+        {
+            return Unauthorized(ApiResponse<object>.Fail("No se pudo identificar al jugador desde el token autenticado."));
+        }
+
+        var response = await _participacionService.InscribirseAsync(torneoId, jugadorIdClaim, request);
+
+        if (!response.Exito)
+        {
+            if (response.Mensaje.Contains("no existe")) return NotFound(response);
+            return BadRequest(response); // Para validaciones de cupo, fecha, pago, etc.
+        }
+
+        return Created("", response);
     }
 }
