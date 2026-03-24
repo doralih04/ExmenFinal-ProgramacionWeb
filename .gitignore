@@ -1,0 +1,17 @@
+# C#/.NET
+[Bb]in/
+[Oo]bj/
+[Tt]emp/
+*.user
+
+# Firebase Credentials (SECRETO)
+firebase-credentials.json
+*.json.bak
+
+# Mac
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.sln
