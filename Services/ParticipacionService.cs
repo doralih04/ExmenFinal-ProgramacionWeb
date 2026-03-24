@@ -115,6 +115,98 @@ public class ParticipacionService : IParticipacionService
         return ApiResponse<ParticipacionResponse>.Success(MapearAResponse(nuevaParticipacion), "Inscripción realizada con éxito.");
     }
 
+    public async Task<ApiResponse<List<MisTorneosResponse>>> ObtenerMisTorneosAsync(string jugadorId)
+    {
+        Query query = _firestoreDb.Collection("participaciones").WhereEqualTo("jugadorId", jugadorId);
+        QuerySnapshot snapshot = await query.GetSnapshotAsync();
+        
+        List<MisTorneosResponse> lista = new List<MisTorneosResponse>();
+
+        foreach (var doc in snapshot.Documents)
+        {
+            if (!doc.Exists) continue;
+            Participacion p = doc.ConvertTo<Participacion>();
+            p.Id = doc.Id;
+
+            // Fetch Torneo info
+            DocumentSnapshot torneoSnapshot = await _firestoreDb.Collection("torneos").Document(p.TorneoId).GetSnapshotAsync();
+            if (torneoSnapshot.Exists)
+            {
+                Torneo t = torneoSnapshot.ConvertTo<Torneo>();
+                lista.Add(new MisTorneosResponse
+                {
+                    ParticipacionId = p.Id,
+                    EstadoParticipacion = p.Estado,
+                    FechaInscripcion = p.FechaInscripcion,
+                    TorneoId = t.Id ?? torneoSnapshot.Id,
+                    NombreTorneo = t.Nombre,
+                    JuegoTorneo = t.Juego,
+                    FechaInicioTorneo = t.FechaInicio,
+                    EstadoTorneo = t.Estado
+                });
+            }
+        }
+
+        return ApiResponse<List<MisTorneosResponse>>.Success(lista);
+    }
+
+    public async Task<ApiResponse<ParticipacionResponse>> AbandonarTorneoAsync(string participacionId, string jugadorId)
+    {
+        DocumentReference partRef = _firestoreDb.Collection("participaciones").Document(participacionId);
+        DocumentSnapshot partSnapshot = await partRef.GetSnapshotAsync();
+
+        if (!partSnapshot.Exists) return ApiResponse<ParticipacionResponse>.Fail("La participación especificada no existe.");
+
+        Participacion participacion = partSnapshot.ConvertTo<Participacion>();
+        participacion.Id = partSnapshot.Id;
+
+        // Regla: Solo el jugador dueño puede abandonar
+        if (participacion.JugadorId != jugadorId)
+        {
+            return ApiResponse<ParticipacionResponse>.Fail("No tienes permiso para abandonar esta participación.");
+        }
+
+        if (participacion.Estado == "abandonado")
+        {
+            return ApiResponse<ParticipacionResponse>.Fail("Ya has abandonado este torneo previamente.");
+        }
+
+        // Fetch Torneo state
+        DocumentReference torneoRef = _firestoreDb.Collection("torneos").Document(participacion.TorneoId);
+        DocumentSnapshot torneoSnapshot = await torneoRef.GetSnapshotAsync();
+
+        if (!torneoSnapshot.Exists) return ApiResponse<ParticipacionResponse>.Fail("El torneo relacional no existe.");
+
+        Torneo torneo = torneoSnapshot.ConvertTo<Torneo>();
+
+        // Regla: Solo permitir abandono si el estado del torneo es \"próximo\"
+        if (torneo.Estado.ToLower() != "próximo")
+        {
+            return ApiResponse<ParticipacionResponse>.Fail($"No se puede abandonar un torneo en estado '{torneo.Estado}'. Debe estar en estado 'próximo'.");
+        }
+
+        // Logica para cambiar estado a "abandonado"
+        Dictionary<string, object> partUpdates = new Dictionary<string, object>
+        {
+            { "estado", "abandonado" },
+            { "fechaEliminacion", DateTime.UtcNow }
+        };
+
+        await partRef.UpdateAsync(partUpdates);
+
+        // Regla: Decrementar participantesActuales de manera segura (evitar decrementos incorrectos)
+        if (torneo.ParticipantesActuales > 0)
+        {
+            await torneoRef.UpdateAsync("participantesActuales", FieldValue.Increment(-1));
+        }
+
+        DocumentSnapshot updatedPartSnapshot = await partRef.GetSnapshotAsync();
+        Participacion updatedPart = updatedPartSnapshot.ConvertTo<Participacion>();
+        updatedPart.Id = updatedPartSnapshot.Id;
+
+        return ApiResponse<ParticipacionResponse>.Success(MapearAResponse(updatedPart), "Has abandonado el torneo con éxito.");
+    }
+
     private ParticipacionResponse MapearAResponse(Participacion p)
     {
         return new ParticipacionResponse
