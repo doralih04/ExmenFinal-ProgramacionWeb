@@ -74,6 +74,8 @@ builder.Services.AddScoped<IJugadorService, JugadorService>();
 builder.Services.AddScoped<IJuegoService, JuegoService>();
 builder.Services.AddScoped<ITorneoService, TorneoService>();
 builder.Services.AddScoped<IParticipacionService, ParticipacionService>();
+builder.Services.AddScoped<IClasificacionService, ClasificacionService>();
+builder.Services.AddScoped<IReporteService, ReporteService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
