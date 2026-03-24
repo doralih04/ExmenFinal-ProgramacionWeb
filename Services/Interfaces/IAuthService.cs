@@ -6,4 +6,5 @@ namespace JuegosTorneosApi.Services.Interfaces;
 public interface IAuthService
 {
     Task<ApiResponse<JugadorPublicoResponse>> RegistroAsync(RegistroRequest request);
+    Task<ApiResponse<AuthResponse>> LoginAsync(LoginRequest request);
 }
