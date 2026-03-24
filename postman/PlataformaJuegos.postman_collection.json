@@ -1,0 +1,605 @@
+{
+  "info": {
+    "_postman_id": "plataforma-juegos-torneos-collection",
+    "name": "Plataforma de Juegos y Torneos — Backend API",
+    "description": "Colección de pruebas para el Examen Final de Programación Web II.\nOrganizada por los 5 escenarios del examen. Backend en .NET 8 + Firebase Firestore + JWT.\n\nVariables de entorno requeridas:\n- baseUrl: http://localhost:5288\n- jwtToken: se obtiene del login\n- jugadorId, juegoId, torneoId, participacionId",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+
+    {
+      "name": "Escenario 1 — Autenticación y Gestión de Jugadores",
+      "description": "Integrante 1. Cubre registro, login con JWT y gestión de perfil de jugadores.",
+      "item": [
+
+        {
+          "name": "1.1 Registro exitoso",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/registro", "host": ["{{baseUrl}}"], "path": ["api","auth","registro"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Carlos Pérez\",\n  \"nombreUsuario\": \"cperez99\",\n  \"correo\": \"cperez@test.com\",\n  \"contrasena\": \"Password123!\",\n  \"rol\": \"jugador\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));", "pm.test('Exito true', () => pm.expect(pm.response.json().exito).to.be.true);"] }
+          }]
+        },
+
+        {
+          "name": "1.2 Registro correo duplicado (error)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/registro", "host": ["{{baseUrl}}"], "path": ["api","auth","registro"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Otro Usuario\",\n  \"nombreUsuario\": \"otro123\",\n  \"correo\": \"cperez@test.com\",\n  \"contrasena\": \"Password123!\",\n  \"rol\": \"jugador\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));", "pm.test('Exito false', () => pm.expect(pm.response.json().exito).to.be.false);"] }
+          }]
+        },
+
+        {
+          "name": "1.3 Login exitoso → guarda token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api","auth","login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"cperez@test.com\",\n  \"contrasena\": \"Password123!\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "if (json.exito && json.data && json.data.token) {",
+              "  pm.environment.set('jwtToken', json.data.token);",
+              "  console.log('Token guardado en entorno.');",
+              "}"
+            ]}
+          }]
+        },
+
+        {
+          "name": "1.4 Login credenciales inválidas (error)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api","auth","login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"cperez@test.com\",\n  \"contrasena\": \"ContraseñaIncorrecta\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"] }
+          }]
+        },
+
+        {
+          "name": "1.5 Obtener jugador por ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/jugadores/{{jugadorId}}", "host": ["{{baseUrl}}"], "path": ["api","jugadores","{{jugadorId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Sin contraseña', () => pm.expect(pm.response.json().data).to.not.have.property('contrasena'));"] }
+          }]
+        },
+
+        {
+          "name": "1.6 Actualizar perfil del jugador",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/jugadores/{{jugadorId}}/perfil", "host": ["{{baseUrl}}"], "path": ["api","jugadores","{{jugadorId}}","perfil"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Carlos Pérez Actualizado\",\n  \"nombreUsuario\": \"cperez_new\",\n  \"avatar\": \"https://example.com/avatar.png\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        }
+
+      ]
+    },
+
+    {
+      "name": "Escenario 2 — Gestión de Videojuegos",
+      "description": "Integrante 2. CRUD completo de videojuegos. Escritura solo para admin.",
+      "item": [
+
+        {
+          "name": "2.1 Crear juego exitoso",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/juegos", "host": ["{{baseUrl}}"], "path": ["api","juegos"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Legends of Fire\",\n  \"desarrollador\": \"Epic Studio\",\n  \"genero\": \"RPG\",\n  \"plataformas\": [\"PC\", \"PS5\"],\n  \"fechaLanzamiento\": \"2023-06-15T00:00:00Z\",\n  \"descripcion\": \"Un juego de acción y rol con mundos abiertos y combate épico.\",\n  \"estado\": \"disponible\",\n  \"puntuacionPromedio\": 8.5\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));"] }
+          }]
+        },
+
+        {
+          "name": "2.2 Crear juego título duplicado (error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/juegos", "host": ["{{baseUrl}}"], "path": ["api","juegos"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Legends of Fire\",\n  \"desarrollador\": \"Otro\",\n  \"genero\": \"FPS\",\n  \"plataformas\": [\"PC\"],\n  \"fechaLanzamiento\": \"2024-01-01T00:00:00Z\",\n  \"descripcion\": \"Descripción de más de veinte caracteres para pasar la validación.\",\n  \"estado\": \"disponible\",\n  \"puntuacionPromedio\": 7.0\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 409', () => pm.response.to.have.status(409));"] }
+          }]
+        },
+
+        {
+          "name": "2.3 Crear juego descripción inválida (error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/juegos", "host": ["{{baseUrl}}"], "path": ["api","juegos"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Juego Corto\",\n  \"desarrollador\": \"Dev\",\n  \"genero\": \"Acción\",\n  \"plataformas\": [\"Xbox\"],\n  \"fechaLanzamiento\": \"2024-01-01T00:00:00Z\",\n  \"descripcion\": \"Corta\",\n  \"estado\": \"disponible\",\n  \"puntuacionPromedio\": 5.0\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"] }
+          }]
+        },
+
+        {
+          "name": "2.4 Listar juegos disponibles",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/juegos",
+              "host": ["{{baseUrl}}"], "path": ["api","juegos"],
+              "query": [
+                { "key": "genero", "value": "RPG", "disabled": true },
+                { "key": "plataforma", "value": "PC", "disabled": true },
+                { "key": "desarrollador", "value": "Epic Studio", "disabled": true }
+              ]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Array de juegos', () => pm.expect(pm.response.json().data).to.be.an('array'));"] }
+          }]
+        },
+
+        {
+          "name": "2.5 Obtener juego por ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/juegos/{{juegoId}}", "host": ["{{baseUrl}}"], "path": ["api","juegos","{{juegoId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "2.6 Actualizar juego",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/juegos/{{juegoId}}", "host": ["{{baseUrl}}"], "path": ["api","juegos","{{juegoId}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Legends of Fire — Edición Especial\",\n  \"desarrollador\": \"Epic Studio\",\n  \"genero\": \"RPG\",\n  \"plataformas\": [\"PC\", \"PS5\", \"Switch\"],\n  \"descripcion\": \"Ahora con nuevo contenido descargable y modos multijugador mejorados.\",\n  \"estado\": \"disponible\",\n  \"puntuacionPromedio\": 9.0\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "2.7 Eliminar juego",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/juegos/{{juegoId}}", "host": ["{{baseUrl}}"], "path": ["api","juegos","{{juegoId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200 o 204', () => pm.expect(pm.response.code).to.be.oneOf([200, 204]));"] }
+          }]
+        }
+
+      ]
+    },
+
+    {
+      "name": "Escenario 3 — Creación y Gestión de Torneos",
+      "description": "Integrante 3. CRUD de torneos con validaciones de fechas, formato y estado.",
+      "item": [
+
+        {
+          "name": "3.1 Crear torneo exitoso",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos", "host": ["{{baseUrl}}"], "path": ["api","torneos"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Gran Torneo Primavera 2026\",\n  \"juego\": \"{{juegoId}}\",\n  \"organizador\": \"{{jugadorId}}\",\n  \"descripcion\": \"El torneo más esperado de la temporada para jugadores élite.\",\n  \"estado\": \"próximo\",\n  \"formato\": \"individual\",\n  \"maxParticipantes\": 16,\n  \"precioInscripcion\": 0,\n  \"premioTotal\": 500,\n  \"fechaInicio\": \"2026-06-01T18:00:00Z\",\n  \"fechaFin\": \"2026-06-03T22:00:00Z\",\n  \"fechaLimiteInscripcion\": \"2026-05-28T23:59:00Z\",\n  \"minNivel\": 0,\n  \"maxNivel\": 0,\n  \"requiereEquipo\": false,\n  \"tamanioEquipo\": 1,\n  \"reglasModificadas\": false\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));", "const j = pm.response.json(); if(j.data && j.data.id) pm.environment.set('torneoId', j.data.id);"] }
+          }]
+        },
+
+        {
+          "name": "3.2 Crear torneo fecha inválida (error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos", "host": ["{{baseUrl}}"], "path": ["api","torneos"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Torneo Fecha Pasada\",\n  \"juego\": \"{{juegoId}}\",\n  \"organizador\": \"{{jugadorId}}\",\n  \"descripcion\": \"Descripción de prueba de error con fecha ya expirada en el pasado.\",\n  \"estado\": \"próximo\",\n  \"formato\": \"individual\",\n  \"maxParticipantes\": 8,\n  \"precioInscripcion\": 0,\n  \"premioTotal\": 100,\n  \"fechaInicio\": \"2020-01-01T00:00:00Z\",\n  \"fechaFin\": \"2020-01-03T00:00:00Z\",\n  \"fechaLimiteInscripcion\": \"2019-12-28T00:00:00Z\",\n  \"minNivel\": 0,\n  \"maxNivel\": 0,\n  \"requiereEquipo\": false,\n  \"tamanioEquipo\": 1,\n  \"reglasModificadas\": false\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"] }
+          }]
+        },
+
+        {
+          "name": "3.3 Crear torneo organizador inválido (error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos", "host": ["{{baseUrl}}"], "path": ["api","torneos"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Torneo Sin Organizador\",\n  \"juego\": \"{{juegoId}}\",\n  \"organizador\": \"id-que-no-existe-en-firestore\",\n  \"descripcion\": \"Descripción de prueba para validar organizador inexistente en la BD.\",\n  \"estado\": \"próximo\",\n  \"formato\": \"individual\",\n  \"maxParticipantes\": 8,\n  \"precioInscripcion\": 0,\n  \"premioTotal\": 100,\n  \"fechaInicio\": \"2026-07-01T00:00:00Z\",\n  \"fechaFin\": \"2026-07-03T00:00:00Z\",\n  \"fechaLimiteInscripcion\": \"2026-06-28T00:00:00Z\",\n  \"minNivel\": 0,\n  \"maxNivel\": 0,\n  \"requiereEquipo\": false,\n  \"tamanioEquipo\": 1,\n  \"reglasModificadas\": false\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 400 o 404', () => pm.expect(pm.response.code).to.be.oneOf([400, 404]));"] }
+          }]
+        },
+
+        {
+          "name": "3.4 Listar torneos con filtros",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/torneos",
+              "host": ["{{baseUrl}}"], "path": ["api","torneos"],
+              "query": [
+                { "key": "estado", "value": "próximo", "disabled": true },
+                { "key": "formato", "value": "individual", "disabled": true },
+                { "key": "juego", "value": "{{juegoId}}", "disabled": true }
+              ]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "3.5 Obtener torneo por ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/torneos/{{torneoId}}", "host": ["{{baseUrl}}"], "path": ["api","torneos","{{torneoId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "3.6 Actualizar torneo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos/{{torneoId}}", "host": ["{{baseUrl}}"], "path": ["api","torneos","{{torneoId}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Gran Torneo Primavera 2026 — Edición Gold\",\n  \"juego\": \"{{juegoId}}\",\n  \"descripcion\": \"Versión actualizada del torneo con nuevo premio y más participantes.\",\n  \"formato\": \"individual\",\n  \"maxParticipantes\": 32,\n  \"precioInscripcion\": 0,\n  \"premioTotal\": 1000,\n  \"fechaInicio\": \"2026-06-01T18:00:00Z\",\n  \"fechaFin\": \"2026-06-05T22:00:00Z\",\n  \"fechaLimiteInscripcion\": \"2026-05-29T23:59:00Z\",\n  \"minNivel\": 0,\n  \"maxNivel\": 0,\n  \"requiereEquipo\": false,\n  \"tamanioEquipo\": 1,\n  \"reglasModificadas\": true\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+
+        {
+          "name": "3.7 Cambiar estado del torneo",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos/{{torneoId}}/estado", "host": ["{{baseUrl}}"], "path": ["api","torneos","{{torneoId}}","estado"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"en progreso\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        }
+
+      ]
+    },
+
+    {
+      "name": "Escenario 4 — Participaciones en Torneos",
+      "description": "Integrante 4. Inscripción, seguimiento y abandono de torneos por jugador autenticado.",
+      "item": [
+
+        {
+          "name": "4.1 Inscribirse en torneo exitosamente",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos/{{torneoId}}/inscribirse", "host": ["{{baseUrl}}"], "path": ["api","torneos","{{torneoId}}","inscribirse"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"equipoId\": \"\",\n  \"pagado\": false\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));", "const j = pm.response.json(); if(j.data && j.data.id) pm.environment.set('participacionId', j.data.id);"] }
+          }]
+        },
+
+        {
+          "name": "4.2 Inscripción duplicada (error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos/{{torneoId}}/inscribirse", "host": ["{{baseUrl}}"], "path": ["api","torneos","{{torneoId}}","inscribirse"] },
+            "body": { "mode": "raw", "raw": "{\n  \"equipoId\": \"\",\n  \"pagado\": false\n}" }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"] }
+          }]
+        },
+
+        {
+          "name": "4.3 Inscripción torneo no existente (error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos/TORNEO_QUE_NO_EXISTE/inscribirse", "host": ["{{baseUrl}}"], "path": ["api","torneos","TORNEO_QUE_NO_EXISTE","inscribirse"] },
+            "body": { "mode": "raw", "raw": "{\n  \"equipoId\": \"\",\n  \"pagado\": false\n}" }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 404', () => pm.response.to.have.status(404));"] }
+          }]
+        },
+
+        {
+          "name": "4.4 Inscripción sin pago requerido (error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/torneos/{{torneoId}}/inscribirse", "host": ["{{baseUrl}}"], "path": ["api","torneos","{{torneoId}}","inscribirse"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"equipoId\": \"\",\n  \"pagado\": false\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 400 si cobro habilitado', () => pm.expect(pm.response.code).to.be.oneOf([201, 400]));"] }
+          }]
+        },
+
+        {
+          "name": "4.5 Listar mis torneos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/jugador/mis-torneos", "host": ["{{baseUrl}}"], "path": ["api","jugador","mis-torneos"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Es un array', () => pm.expect(pm.response.json().data).to.be.an('array'));"] }
+          }]
+        },
+
+        {
+          "name": "4.6 Abandonar torneo",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/participaciones/{{participacionId}}/abandonar", "host": ["{{baseUrl}}"], "path": ["api","participaciones","{{participacionId}}","abandonar"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+          }]
+        }
+
+      ]
+    },
+
+    {
+      "name": "Escenario 5 — Reportes y Clasificaciones",
+      "description": "Integrante 5. Rankings globales, reportes analíticos y desempeño personal.",
+      "item": [
+
+        {
+          "name": "5.1 Ranking global por juego (con filtro de nivel)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/clasificaciones/{{juegoId}}",
+              "host": ["{{baseUrl}}"], "path": ["api","clasificaciones","{{juegoId}}"],
+              "query": [
+                { "key": "minNivel", "value": "1", "disabled": true },
+                { "key": "maxNivel", "value": "10", "disabled": true }
+              ]
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Max 50 resultados', () => pm.expect(pm.response.json().data.length).to.be.at.most(50));"] }
+          }]
+        },
+
+        {
+          "name": "5.2 Mi clasificación en un juego",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/jugador/clasificacion/{{juegoId}}", "host": ["{{baseUrl}}"], "path": ["api","jugador","clasificacion","{{juegoId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200 o 404', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"] }
+          }]
+        },
+
+        {
+          "name": "5.3 Torneos populares (últimos 30 días) — solo admin/org",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/reportes/torneos-populares", "host": ["{{baseUrl}}"], "path": ["api","reportes","torneos-populares"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200 o 403', () => pm.expect(pm.response.code).to.be.oneOf([200, 403]));"] }
+          }]
+        },
+
+        {
+          "name": "5.4 Jugadores destacados — top 20",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/reportes/jugadores-destacados", "host": ["{{baseUrl}}"], "path": ["api","reportes","jugadores-destacados"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Max 20 jugadores', () => pm.expect(pm.response.json().data.length).to.be.at.most(20));"] }
+          }]
+        },
+
+        {
+          "name": "5.5 Mi desempeño en un juego específico",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/reportes/mi-desempeno/{{juegoId}}", "host": ["{{baseUrl}}"], "path": ["api","reportes","mi-desempeno","{{juegoId}}"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200 o 404', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"] }
+          }]
+        },
+
+        {
+          "name": "5.6 Tendencias de la plataforma — solo admin",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/reportes/tendencias", "host": ["{{baseUrl}}"], "path": ["api","reportes","tendencias"] }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('Status 200 o 403', () => pm.expect(pm.response.code).to.be.oneOf([200, 403]));"] }
+          }]
+        }
+
+      ]
+    }
+
+  ]
+}
