@@ -71,6 +71,7 @@ builder.Services.AddCors(options =>
 // Registrar Servicios (DI)
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJugadorService, JugadorService>();
+builder.Services.AddScoped<IJuegoService, JuegoService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
